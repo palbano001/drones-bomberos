@@ -2,40 +2,29 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Sistema RPAS Bomberos</title>
+<title>Sistema RPAS + Clima</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <style>
-body{
-  margin:0;
-  font-family:Arial;
-  background:#0f172a;
-  color:white;
-}
+body { margin:0; font-family:Arial; background:#0f172a; color:white; }
+header { background:#dc2626; padding:15px; text-align:center; }
 
-header{
-  background:#dc2626;
-  padding:15px;
-  text-align:center;
-  font-weight:bold;
-}
-
-.container{
+.container {
   display:grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns:1fr 1fr;
   gap:20px;
   padding:20px;
 }
 
-.panel{
+.panel {
   background:#1e293b;
   padding:15px;
   border-radius:10px;
 }
 
-input,select,textarea,button{
+input,select,textarea,button {
   width:100%;
   padding:10px;
   margin:5px 0;
@@ -43,15 +32,11 @@ input,select,textarea,button{
   border-radius:5px;
 }
 
-button{
-  background:#dc2626;
-  color:white;
-  cursor:pointer;
-}
+button { background:#dc2626; color:white; }
 
-#mapa{ height:300px; }
+#mapa { height:300px; }
 
-.card{
+.card {
   background:#0f172a;
   padding:10px;
   margin-top:10px;
@@ -62,12 +47,14 @@ button{
 
 <body>
 
-<header>🚁 SISTEMA RPAS BOMBEROS</header>
+<header>🚁 SISTEMA RPAS + METEOROLOGÍA</header>
 
 <div class="container">
 
-<!-- PANEL FORM -->
 <div class="panel">
+<h3>Clima en Tiempo Real</h3>
+<div id="clima">Cargando...</div>
+<button onclick="obtenerClima()">Actualizar</button>
 
 <h3>Registrar Misión</h3>
 
@@ -92,38 +79,56 @@ button{
 
 </div>
 
-<!-- PANEL MAPA -->
 <div class="panel">
-
-<h3>Ubicación</h3>
-
+<h3>Mapa</h3>
 <div id="mapa"></div>
-
 <button onclick="borrarUbicacion()">Borrar ubicación</button>
-
 </div>
 
 </div>
 
 <div class="container">
-
-<!-- HISTORICO -->
-<div class="panel" style="grid-column: span 2;">
-
+<div class="panel" style="grid-column:span 2;">
 <h3>Histórico</h3>
-
 <input id="buscar" placeholder="Buscar..." onkeyup="mostrar()">
-
 <div id="lista"></div>
-
 </div>
-
 </div>
 
 <script>
 
-let lat=null,lng=null;
-let marcador=null;
+const apiKey = "TU_API_KEY";
+const appKey = "TU_APPLICATION_KEY";
+
+let climaActual = {};
+
+async function obtenerClima(){
+
+const url = `https://api.ambientweather.net/v1/devices?apiKey=${apiKey}&applicationKey=${appKey}`;
+
+const res = await fetch(url);
+const data = await res.json();
+
+const c = data[0].lastData;
+
+climaActual = {
+  temp: c.tempf,
+  humedad: c.humidity,
+  viento: c.windspeedmph
+};
+
+document.getElementById("clima").innerHTML = `
+🌡️ Temp: ${c.tempf}°F <br>
+💧 Humedad: ${c.humidity}% <br>
+🌬️ Viento: ${c.windspeedmph} mph
+`;
+
+}
+
+setInterval(obtenerClima,60000);
+obtenerClima();
+
+let lat=null,lng=null,marcador=null;
 
 let mapa=L.map('mapa').setView([-0.25,-79.17],13);
 
@@ -133,9 +138,7 @@ mapa.on('click',e=>{
 lat=e.latlng.lat;
 lng=e.latlng.lng;
 
-if(marcador){
-mapa.removeLayer(marcador);
-}
+if(marcador){ mapa.removeLayer(marcador); }
 
 marcador=L.marker([lat,lng]).addTo(mapa);
 });
@@ -156,7 +159,6 @@ return "RPAS-"+Date.now();
 function guardarMision(){
 
 let archivos=document.getElementById("fotos").files;
-
 let fotos=[];
 
 if(archivos.length>0){
@@ -167,7 +169,7 @@ for(let i=0;i<archivos.length && i<4;i++){
 
 let reader=new FileReader();
 
-reader.onload=function(e){
+reader.onload=e=>{
 fotos.push(e.target.result);
 contador++;
 
@@ -177,7 +179,6 @@ guardarFinal(fotos);
 };
 
 reader.readAsDataURL(archivos[i]);
-
 }
 
 }else{
@@ -196,7 +197,8 @@ tipo:tipo.value,
 piloto:piloto.value,
 horas:horas.value,
 descripcion:descripcion.value,
-lat,lng,fotos
+lat,lng,fotos,
+clima:climaActual
 };
 
 let datos=JSON.parse(localStorage.getItem("misiones"))||[];
@@ -204,14 +206,14 @@ datos.push(mision);
 
 localStorage.setItem("misiones",JSON.stringify(datos));
 
-alert("Guardado correctamente");
+alert("Guardado con clima incluido");
 
 mostrar();
 }
 
 function mostrar(){
 
-let texto=document.getElementById("buscar").value.toLowerCase();
+let texto=buscar.value.toLowerCase();
 
 let lista=document.getElementById("lista");
 lista.innerHTML="";
@@ -222,15 +224,13 @@ datos.forEach(m=>{
 
 if(m.lugar.toLowerCase().includes(texto)){
 
-let imgs=(m.fotos||[]).map(f=>`<img src="${f}" width="60">`).join("");
-
 lista.innerHTML+=`
 <div class="card">
 <b>${m.codigo}</b><br>
 📍 ${m.lugar}<br>
 🔥 ${m.tipo}<br>
-👨‍🚒 ${m.piloto}<br>
-${imgs}
+🌡️ ${m.clima?.temp || "-"}°F<br>
+🌬️ ${m.clima?.viento || "-"} mph
 </div>
 `;
 }
