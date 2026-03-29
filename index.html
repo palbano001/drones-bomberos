@@ -6,39 +6,68 @@
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
-body { font-family: Arial; background:#0f172a; color:white; }
-header { background:#dc2626; padding:15px; text-align:center; font-size:18px; }
-
-.container { padding:20px; max-width:900px; margin:auto; }
-
-input, select, textarea, button {
-  width:100%; padding:10px; margin:5px 0;
-  border-radius:5px; border:none;
+body{
+  margin:0;
+  font-family:Arial;
+  background:#0f172a;
+  color:white;
 }
 
-button { background:#dc2626; color:white; cursor:pointer; }
+header{
+  background:#dc2626;
+  padding:15px;
+  text-align:center;
+  font-weight:bold;
+}
 
-.card {
+.container{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:20px;
+  padding:20px;
+}
+
+.panel{
   background:#1e293b;
   padding:15px;
-  margin-top:10px;
-  border-radius:8px;
+  border-radius:10px;
 }
 
-img { width:80px; margin:3px; border-radius:5px; }
+input,select,textarea,button{
+  width:100%;
+  padding:10px;
+  margin:5px 0;
+  border:none;
+  border-radius:5px;
+}
 
-#mapa { height:300px; margin-top:10px; }
+button{
+  background:#dc2626;
+  color:white;
+  cursor:pointer;
+}
+
+#mapa{ height:300px; }
+
+.card{
+  background:#0f172a;
+  padding:10px;
+  margin-top:10px;
+  border-radius:5px;
+}
 </style>
 </head>
 
 <body>
 
-<header>🚁 SISTEMA RPAS - BOMBEROS</header>
+<header>🚁 SISTEMA RPAS BOMBEROS</header>
 
 <div class="container">
+
+<!-- PANEL FORM -->
+<div class="panel">
 
 <h3>Registrar Misión</h3>
 
@@ -54,43 +83,71 @@ img { width:80px; margin:3px; border-radius:5px; }
 
 <input id="piloto" placeholder="Piloto">
 <input id="horas" placeholder="Horas de vuelo">
-<input id="objetivoG" placeholder="Objetivo general">
-<textarea id="objetivoE" placeholder="Objetivos específicos"></textarea>
 
-<input type="file" id="fotos" multiple accept="image/*">
+<textarea id="descripcion" placeholder="Descripción"></textarea>
+
+<input type="file" id="fotos" multiple>
 
 <button onclick="guardarMision()">Guardar</button>
 
-<h3>Seleccionar Ubicación</h3>
+</div>
+
+<!-- PANEL MAPA -->
+<div class="panel">
+
+<h3>Ubicación</h3>
+
 <div id="mapa"></div>
+
+<button onclick="borrarUbicacion()">Borrar ubicación</button>
+
+</div>
+
+</div>
+
+<div class="container">
+
+<!-- HISTORICO -->
+<div class="panel" style="grid-column: span 2;">
 
 <h3>Histórico</h3>
 
-<input id="buscar" placeholder="Buscar..." onkeyup="filtrar()">
-<select id="filtroTipo" onchange="filtrar()">
-<option value="">Todas</option>
-<option>Incendio estructural</option>
-<option>Incendio forestal</option>
-<option>Búsqueda y rescate</option>
-<option>Inspección</option>
-</select>
+<input id="buscar" placeholder="Buscar..." onkeyup="mostrar()">
 
 <div id="lista"></div>
+
+</div>
 
 </div>
 
 <script>
 
 let lat=null,lng=null;
+let marcador=null;
 
 let mapa=L.map('mapa').setView([-0.25,-79.17],13);
+
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapa);
 
 mapa.on('click',e=>{
 lat=e.latlng.lat;
 lng=e.latlng.lng;
-L.marker([lat,lng]).addTo(mapa);
+
+if(marcador){
+mapa.removeLayer(marcador);
+}
+
+marcador=L.marker([lat,lng]).addTo(mapa);
 });
+
+function borrarUbicacion(){
+if(marcador){
+mapa.removeLayer(marcador);
+marcador=null;
+lat=null;
+lng=null;
+}
+}
 
 function generarCodigo(){
 return "RPAS-"+Date.now();
@@ -99,23 +156,34 @@ return "RPAS-"+Date.now();
 function guardarMision(){
 
 let archivos=document.getElementById("fotos").files;
+
 let fotos=[];
 
+if(archivos.length>0){
+
+let contador=0;
+
 for(let i=0;i<archivos.length && i<4;i++){
+
 let reader=new FileReader();
+
 reader.onload=function(e){
 fotos.push(e.target.result);
+contador++;
 
-if(fotos.length===Math.min(archivos.length,4)){
+if(contador===Math.min(archivos.length,4)){
 guardarFinal(fotos);
 }
 };
+
 reader.readAsDataURL(archivos[i]);
+
 }
 
-if(archivos.length===0){
+}else{
 guardarFinal([]);
 }
+
 }
 
 function guardarFinal(fotos){
@@ -127,26 +195,34 @@ fecha:fecha.value,
 tipo:tipo.value,
 piloto:piloto.value,
 horas:horas.value,
-objetivoG:objetivoG.value,
-objetivoE:objetivoE.value,
+descripcion:descripcion.value,
 lat,lng,fotos
 };
 
 let datos=JSON.parse(localStorage.getItem("misiones"))||[];
 datos.push(mision);
+
 localStorage.setItem("misiones",JSON.stringify(datos));
+
+alert("Guardado correctamente");
 
 mostrar();
 }
 
 function mostrar(){
+
+let texto=document.getElementById("buscar").value.toLowerCase();
+
 let lista=document.getElementById("lista");
 lista.innerHTML="";
 
 let datos=JSON.parse(localStorage.getItem("misiones"))||[];
 
 datos.forEach(m=>{
-let imgs=m.fotos.map(f=>`<img src="${f}">`).join("");
+
+if(m.lugar.toLowerCase().includes(texto)){
+
+let imgs=(m.fotos||[]).map(f=>`<img src="${f}" width="60">`).join("");
 
 lista.innerHTML+=`
 <div class="card">
@@ -154,66 +230,13 @@ lista.innerHTML+=`
 📍 ${m.lugar}<br>
 🔥 ${m.tipo}<br>
 👨‍🚒 ${m.piloto}<br>
-⏱ ${m.horas} h<br>
 ${imgs}
-<button onclick='pdf(${JSON.stringify(m)})'>📄 PDF</button>
 </div>
 `;
-});
 }
 
-function filtrar(){
-let texto=buscar.value.toLowerCase();
-let tipoF=filtroTipo.value;
-
-let datos=JSON.parse(localStorage.getItem("misiones"))||[];
-
-let filtrados=datos.filter(m=>
-m.lugar.toLowerCase().includes(texto) &&
-(tipoF==""||m.tipo==tipoF)
-);
-
-let lista=document.getElementById("lista");
-lista.innerHTML="";
-
-filtrados.forEach(m=>{
-lista.innerHTML+=`
-<div class="card">
-<b>${m.codigo}</b><br>
-${m.lugar}<br>
-${m.tipo}
-<button onclick='pdf(${JSON.stringify(m)})'>PDF</button>
-</div>`;
 });
-}
 
-function pdf(m){
-
-const {jsPDF}=window.jspdf;
-let doc=new jsPDF();
-
-doc.setFontSize(16);
-doc.text("INFORME TÉCNICO RPAS",20,20);
-
-doc.setFontSize(10);
-
-doc.text("Código: "+m.codigo,20,30);
-doc.text("Lugar: "+m.lugar,20,40);
-doc.text("Fecha: "+m.fecha,20,50);
-doc.text("Tipo: "+m.tipo,20,60);
-doc.text("Piloto: "+m.piloto,20,70);
-doc.text("Horas de vuelo: "+m.horas,20,80);
-
-doc.text("Objetivo General:",20,95);
-doc.text(m.objetivoG,20,105);
-
-doc.text("Objetivos Específicos:",20,120);
-doc.text(m.objetivoE,20,130);
-
-doc.text("Coordenadas:",20,150);
-doc.text("Lat: "+m.lat+" Lng: "+m.lng,20,160);
-
-doc.save(m.codigo+".pdf");
 }
 
 mostrar();
