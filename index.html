@@ -1,56 +1,51 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Sistema de Operaciones con Drones</title>
+<meta charset="UTF-8">
+<title>Sistema de Operaciones con Drones</title>
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #0f172a;
-      color: white;
-      margin: 0;
-      padding: 0;
-    }
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
-    header {
-      background: #dc2626;
-      padding: 15px;
-      text-align: center;
-      font-size: 20px;
-      font-weight: bold;
-    }
+<style>
+body {
+  font-family: Arial;
+  background: #0f172a;
+  color: white;
+  margin: 0;
+}
 
-    .container {
-      padding: 20px;
-    }
+header {
+  background: #dc2626;
+  padding: 15px;
+  text-align: center;
+  font-weight: bold;
+}
 
-    input, textarea, button {
-      width: 100%;
-      padding: 10px;
-      margin: 5px 0;
-      border-radius: 5px;
-      border: none;
-    }
+.container {
+  padding: 20px;
+}
 
-    button {
-      background: #dc2626;
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-    }
+input, textarea, button {
+  width: 100%;
+  padding: 10px;
+  margin: 5px 0;
+  border-radius: 5px;
+  border: none;
+}
 
-    button:hover {
-      background: #b91c1c;
-    }
+button {
+  background: #dc2626;
+  color: white;
+  cursor: pointer;
+}
 
-    .card {
-      background: #1e293b;
-      padding: 10px;
-      margin-top: 10px;
-      border-radius: 5px;
-    }
-  </style>
+.card {
+  background: #1e293b;
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 5px;
+}
+</style>
 </head>
 
 <body>
@@ -61,22 +56,31 @@
 
 <div class="container">
 
-  <h2>Registrar Misión</h2>
+<h2>Registrar Misión</h2>
 
-  <input type="text" id="lugar" placeholder="Lugar del incidente">
-  <input type="date" id="fecha">
-  <input type="text" id="tipo" placeholder="Tipo de emergencia">
-  <input type="text" id="piloto" placeholder="Nombre del piloto">
-  <textarea id="descripcion" placeholder="Observaciones"></textarea>
+<input type="text" id="lugar" placeholder="Lugar">
+<input type="date" id="fecha">
+<input type="text" id="tipo" placeholder="Tipo de emergencia">
+<input type="text" id="piloto" placeholder="Piloto">
+<textarea id="descripcion" placeholder="Observaciones"></textarea>
 
-  <button onclick="guardarMision()">Guardar Misión</button>
+<button onclick="guardarMision()">Guardar</button>
 
-  <h2>Misiones Registradas</h2>
-  <div id="listaMisiones"></div>
+<h2>Mapa</h2>
+<div id="mapa" style="height:300px;"></div>
+
+<h2>Misiones</h2>
+<div id="lista"></div>
 
 </div>
 
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
 <script>
+let mapa = L.map('mapa').setView([-0.25, -79.17], 13);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapa);
+
 function guardarMision() {
   const lugar = document.getElementById("lugar").value;
   const fecha = document.getElementById("fecha").value;
@@ -84,44 +88,51 @@ function guardarMision() {
   const piloto = document.getElementById("piloto").value;
   const descripcion = document.getElementById("descripcion").value;
 
-  const mision = {
-    lugar,
-    fecha,
-    tipo,
-    piloto,
-    descripcion
-  };
+  navigator.geolocation.getCurrentPosition(function(pos) {
 
-  let misiones = JSON.parse(localStorage.getItem("misiones")) || [];
-  misiones.push(mision);
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
 
-  localStorage.setItem("misiones", JSON.stringify(misiones));
+    const mision = { lugar, fecha, tipo, piloto, descripcion, lat, lng };
 
-  alert("✅ Misión guardada correctamente");
+    let misiones = JSON.parse(localStorage.getItem("misiones")) || [];
+    misiones.push(mision);
 
-  mostrarMisiones();
+    localStorage.setItem("misiones", JSON.stringify(misiones));
+
+    L.marker([lat, lng]).addTo(mapa).bindPopup(lugar);
+
+    mostrarMisiones();
+
+    alert("Guardado");
+  });
 }
 
 function mostrarMisiones() {
-  const lista = document.getElementById("listaMisiones");
+  const lista = document.getElementById("lista");
   lista.innerHTML = "";
 
   let misiones = JSON.parse(localStorage.getItem("misiones")) || [];
 
-  misiones.forEach((m, index) => {
+  misiones.forEach(m => {
+
     lista.innerHTML += `
       <div class="card">
-        <strong>📍 Lugar:</strong> ${m.lugar} <br>
-        <strong>📅 Fecha:</strong> ${m.fecha} <br>
-        <strong>🔥 Tipo:</strong> ${m.tipo} <br>
-        <strong>👨‍🚒 Piloto:</strong> ${m.piloto} <br>
-        <strong>📝 Observación:</strong> ${m.descripcion}
+        <b>${m.lugar}</b><br>
+        ${m.fecha}<br>
+        ${m.tipo}<br>
+        ${m.piloto}<br>
+        ${m.descripcion}
       </div>
     `;
+
+    if(m.lat && m.lng){
+      L.marker([m.lat, m.lng]).addTo(mapa).bindPopup(m.lugar);
+    }
+
   });
 }
 
-// Cargar misiones al iniciar
 mostrarMisiones();
 </script>
 
