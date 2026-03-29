@@ -106,28 +106,41 @@ const appKey = "TU_APPLICATION_KEY";
 
 let climaActual = {};
 
+// 🔥 OBTENER CLIMA CORREGIDO
 async function obtenerClima(){
 try{
 const res = await fetch(`https://api.ambientweather.net/v1/devices?apiKey=${apiKey}&applicationKey=${appKey}`);
 const data = await res.json();
+
+if(data && data.length > 0){
+
 const c = data[0].lastData;
 
 climaActual = {
-temp: c.tempf,
-humedad: c.humidity,
-viento: c.windspeedmph
+temp: c.tempf || 0,
+humedad: c.humidity || 0,
+viento: c.windspeedmph || 0
 };
 
+// convertir a °C
+let tempC = ((c.tempf - 32) * 5/9).toFixed(1);
+
 document.getElementById("clima").innerHTML =
-`🌡️ ${c.tempf}°F | 💧 ${c.humidity}% | 🌬️ ${c.windspeedmph} mph`;
+`🌡️ ${tempC}°C | 💧 ${c.humidity}% | 🌬️ ${c.windspeedmph} mph`;
 
-}catch{
+}
+
+}catch(e){
 document.getElementById("clima").innerText="Error clima";
+console.log(e);
 }
 }
 
+// auto actualizar
+setInterval(obtenerClima,60000);
 obtenerClima();
 
+// MAPA
 let lat=null,lng=null,marcador=null;
 
 let mapa=L.map('mapa').setView([-0.25,-79.17],13);
@@ -148,11 +161,15 @@ lat=null; lng=null;
 }
 }
 
+// GENERAR CÓDIGO
 function generarCodigo(){
 return "RPAS-"+Date.now();
 }
 
-function guardarMision(){
+// GUARDAR MISIÓN (CORREGIDO)
+async function guardarMision(){
+
+await obtenerClima(); // 🔥 clave
 
 let archivos=document.getElementById("fotos").files;
 let fotos=[];
@@ -180,6 +197,7 @@ guardarFinal([]);
 
 }
 
+// GUARDADO FINAL
 function guardarFinal(fotos){
 
 let mision={
@@ -199,11 +217,12 @@ datos.push(mision);
 
 localStorage.setItem("misiones",JSON.stringify(datos));
 
-alert("Guardado");
+alert("Guardado correctamente");
 
 mostrar();
 }
 
+// MOSTRAR
 function mostrar(){
 
 let texto=buscar.value.toLowerCase();
@@ -222,7 +241,7 @@ lista.innerHTML+=`
 <b>${m.codigo}</b><br>
 📍 ${m.lugar}<br>
 🔥 ${m.tipo}<br>
-🌡️ ${m.clima?.temp || "-"}°F<br>
+🌡️ ${m.clima?.temp ?? "N/A"}°F<br>
 ${imgs}
 <br>
 <button onclick='generarPDF(${JSON.stringify(m)})'>📄 Descargar PDF</button>
@@ -231,7 +250,7 @@ ${imgs}
 });
 }
 
-// 🔥 PDF PRO
+// PDF PROFESIONAL
 function generarPDF(m){
 
 const { jsPDF } = window.jspdf;
@@ -250,21 +269,20 @@ doc.text("Piloto: " + m.piloto, 20, 70);
 doc.text("Horas de vuelo: " + m.horas, 20, 80);
 
 doc.text("Descripción:", 20, 95);
-doc.text(m.descripcion, 20, 105);
+doc.text(m.descripcion || "-", 20, 105);
 
 doc.text("Clima:", 20, 120);
-doc.text(`Temp: ${m.clima?.temp}°F`, 20, 130);
-doc.text(`Humedad: ${m.clima?.humedad}%`, 20, 140);
-doc.text(`Viento: ${m.clima?.viento} mph`, 20, 150);
+doc.text(`Temp: ${m.clima?.temp ?? "N/A"}°F`, 20, 130);
+doc.text(`Humedad: ${m.clima?.humedad ?? "N/A"}%`, 20, 140);
+doc.text(`Viento: ${m.clima?.viento ?? "N/A"} mph`, 20, 150);
 
 doc.text("Coordenadas:", 20, 165);
-doc.text(`Lat: ${m.lat} Lng: ${m.lng}`, 20, 175);
+doc.text(`Lat: ${m.lat ?? "-"} Lng: ${m.lng ?? "-"}`, 20, 175);
 
-// 📸 insertar imágenes
+// fotos
 let y=190;
-
 (m.fotos||[]).forEach(f=>{
-doc.addImage(f, 'JPEG', 20, y, 50, 40);
+doc.addImage(f,'JPEG',20,y,50,40);
 y+=45;
 });
 
